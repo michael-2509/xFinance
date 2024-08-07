@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Advisor Chatbot</title>
+    <style>
+        body, html {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        .left-column, .right-column {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            height: 100%;
+            box-sizing: border-box;
+        }
+        .left-column {
+            border-right: 1px solid #ccc;
+        }
+        .account-info, .send-money, .transaction-history {
+            margin-bottom: 20px;
+        }
+        .chat-box {
+            height: calc(100% - 100px);
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+        }
+        .bot-message {
+            background-color: #f1f1f1;
+            align-self: flex-start;
+        }
+        .input-box {
+            display: flex;
+        }
+        .query, input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-column">
+            <div class="account-info">
+                <h2>Account Balance: <span id="accountBalance">$45,000.00</span></h2>
+            </div>
+
+            <div class="savings-plans">
+                <h3>Savings Plans</h3>
+                <table id="savingsTable">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Duration</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Current Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Savings plan rows will be added here dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="send-money">
+                <h3>Send Money</h3>
+                <form id="sendMoneyForm">
+                    <input type="text" id="receiverName" placeholder="Receiver Name" required>
+                    <input type="text" id="receiverBank" placeholder="Receiver Bank" required>
+                    <input type="number" id="amount" placeholder="Amount" required>
+                    <input type="text" id="category" placeholder="Category" required>
+                    <button type="submit">Send Money</button>
+                </form>
+            </div>
+            <div class="transaction-history">
+                <h3>Transaction History</h3>
+                <table id="transactionTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Category</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Transaction rows will be added here dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="right-column">
+            <h1>Financial Advisor Chatbot</h1>
+            <div id="chatBox" class="chat-box"></div>
+            <form id="queryForm" class="input-box">
+                <input type="text" id="query" class="query" placeholder="Ask a financial question..." required>
+                <button type="submit">Ask</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('queryForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const query = document.getElementById('query').value;
+            const chatBox = document.getElementById('chatBox');
+            
+            // Add user's message
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'message user-message';
+            userMessageDiv.textContent = query;
+            chatBox.appendChild(userMessageDiv);
+            
+            // Clear the input
+            document.getElementById('query').value = '';
+            
+            // Scroll to the bottom
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const response = await fetch('/get_response', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `query=${encodeURIComponent(query)}`
+            });
+            
+            const data = await response.json();
+            
+            // Add bot's response
+            const botMessageDiv = document.createElement('div');
+            botMessageDiv.className = 'message bot-message';
+            botMessageDiv.textContent = data.response;
+            chatBox.appendChild(botMessageDiv);
+            
+            // Scroll to the bottom
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+
+        document.getElementById('sendMoneyForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const receiverName = document.getElementById('receiverName').value;
+            const receiverBank = document.getElementById('receiverBank').value;
+            const amount = document.getElementById('amount').value;
+            const category = document.getElementById('category').value;
+
+            const response = await fetch('/send_money', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ receiverName, receiverBank, amount, category })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert('Money sent successfully!');
+                updateAccountBalance(data.newBalance);
+                addTransactionToHistory(data.transaction);
+                // Clear the form
+                document.getElementById('sendMoneyForm').reset();
+            } else {
+                alert('Failed to send money: ' + data.message);
+            }
+        });
+
+        function updateAccountBalance(newBalance) {
+            document.getElementById('accountBalance').textContent = `$${newBalance.toFixed(2)}`;
+        }
+
+        function addTransactionToHistory(transaction) {
+            const table = document.getElementById('transactionTable').getElementsByTagName('tbody')[0];
+            const newRow = table.insertRow(0);
+            newRow.innerHTML = `
+                <td>${transaction.date}</td>
+                <td>${transaction.receiverName}</td>
+                <td>$${transaction.amount.toFixed(2)}</td>
+                <td>${transaction.category}</td>
+            `;
+        }
+
+        // Function to fetch and display transaction history
+        async function fetchTransactionHistory() {
+            const response = await fetch('/get_transaction_history');
+            const transactions = await response.json();
+            
+            const table = document.getElementById('transactionTable').getElementsByTagName('tbody')[0];
+            table.innerHTML = ''; // Clear existing rows
+            
+            transactions.forEach(transaction => {
+                const newRow = table.insertRow(-1);
+                newRow.innerHTML = `
+                    <td>${transaction.TransDate}</td>
+                    <td>${transaction.Description}</td>
+                    <td>$${transaction.TransAmount.toFixed(2)}</td>
+                    <td>${transaction.CategoryName}</td>
+                `;
+            });
+        }
+
+        // Call this function when the page loads
+        fetchTransactionHistory();
+
+        async function fetchSavingsPlans() {
+            const response = await fetch('/get_savings_plans');
+            const savingsPlans = await response.json();
+            
+            const table = document.getElementById('savingsTable').getElementsByTagName('tbody')[0];
+            table.innerHTML = ''; // Clear existing rows
+            
+            savingsPlans.forEach(plan => {
+                const newRow = table.insertRow(-1);
+                newRow.innerHTML = `
+                    <td>${plan.type}</td>
+                    <td>$${plan.amount.toFixed(2)}</td>
+                    <td>${plan.duration} months</td>
+                    <td>${plan.start_date}</td>
+                    <td>${plan.end_date}</td>
+                    <td>$${plan.current_balance.toFixed(2)}</td>
+                `;
+            });
+        }
+
+        // Call this function when the page loads
+        fetchSavingsPlans();
+    </script>
+</body>
+</html>
